@@ -44,17 +44,11 @@ RUN yum -y update && yum -y install \
     && yum clean all \
     && rm -rf /var/cache/yum
 
-# Optional diagnostics (enable only if you *really* need them; security may complain)
-# RUN yum -y install \
-#       bind-utils \
-#       iputils \
-#       traceroute \
-#     && yum clean all \
-#     && rm -rf /var/cache/yum
-
-# Non-root user by default
-RUN useradd -m -u 10001 -g 0 toolbox || true
-USER 10001:0
+ARG JATTACH_VERSION="v2.2"
+RUN curl -fsSL -o /usr/local/bin/jattach \
+      "https://github.com/jattach/jattach/releases/download/${JATTACH_VERSION}/jattach" \
+ && chmod +x /usr/local/bin/jattach \
+ && /usr/local/bin/jattach --help >/dev/null 2>&1 || true
 
 # Quick self-test at container start (cheap, deterministic)
 ENTRYPOINT ["/bin/bash", "-lc"]
