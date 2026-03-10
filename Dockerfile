@@ -1,55 +1,22 @@
-# ==============================================================================
-# kheap 1.0 - PT Java Toolbox (Amazon Corretto 21 LTS)
-#
-# Purpose:
-#   A platform-owned debug toolbox image to run inside Kubernetes as an
-#   ephemeral container and perform JVM operations (heap dump via jcmd, etc.)
-#   without relying on tools in the application image.
-#
-# Includes:
-#   - Amazon Corretto 21 JDK (jcmd/jmap/jstack included)
-#   - Minimal ops tools: bash, curl, gzip, tar, procps, coreutils, jq
-#
-# Notes:
-#   - No runtime downloads. Everything is baked at build time.
-#   - Runs as non-root by default (toolbox user). In Kubernetes debug scenarios,
-#     you can still run it as root if your policies require it.
-# ==============================================================================
+FROM alpine:3.23.3 AS builder
 
-FROM amazoncorretto:21
+ARG JATTACH_VERSION=v2.2
+RUN apk add --no-cache curl
+RUN curl -fsSL -o /jattach \
+    https://github.com/jattach/jattach/releases/download/${JATTACH_VERSION}/jattach \
+ && chmod +x /jattach
 
-SHELL ["/bin/bash", "-lc"]
+FROM alpine:3.23.3
 
-# OCI labels (helpful for registry/auditing)
-ARG BUILD_DATE="unknown"
-ARG VCS_REF="unknown"
-ARG VERSION="1.0.0"
+RUN apk add --no-cache \
+    bash \
+    gzip \
+    tar \
+    procps \
+    coreutils \
+    jq
 
-LABEL org.opencontainers.image.title="HeapVault"
-LABEL org.opencontainers.image.description="PT JVM debug toolbox based on Amazon Corretto 21 (jcmd/jmap/jstack + minimal ops tools)"
-LABEL org.opencontainers.image.version="${VERSION}"
-LABEL org.opencontainers.image.revision="${VCS_REF}"
-LABEL org.opencontainers.image.created="${BUILD_DATE}"
-LABEL org.opencontainers.image.licenses="Apache-2.0"
+COPY --from=builder /jattach /usr/local/bin/jattach
 
-# Install minimal tooling
-RUN yum -y update && yum -y install \
-      bash \
-      curl \
-      gzip \
-      tar \
-      procps-ng \
-      coreutils \
-      jq \
-    && yum clean all \
-    && rm -rf /var/cache/yum
-
-ARG JATTACH_VERSION="v2.2"
-RUN curl -fsSL -o /usr/local/bin/jattach \
-      "https://github.com/jattach/jattach/releases/download/${JATTACH_VERSION}/jattach" \
- && chmod +x /usr/local/bin/jattach \
- && /usr/local/bin/jattach --help >/dev/null 2>&1 || true
-
-# Quick self-test at container start (cheap, deterministic)
-ENTRYPOINT ["/bin/bash", "-lc"]
-CMD ["java -version && jcmd -h >/dev/null && echo 'HeapVault ready'"]
+ENTRYPOINT ["/bin/bash","-lc"]
+CMD ["echo 'kheap toolbox ready'"]
