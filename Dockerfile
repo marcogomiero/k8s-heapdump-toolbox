@@ -1,22 +1,21 @@
-FROM alpine:latest AS builder
+FROM cgr.dev/chainguard/wolfi-base:latest AS builder
 
 ARG JATTACH_VERSION=v2.2
-RUN apk add --no-cache curl
-RUN curl -fsSL -o /jattach \
-    https://github.com/jattach/jattach/releases/download/${JATTACH_VERSION}/jattach \
- && chmod +x /jattach
 
-FROM alpine:latest
+USER root
 
-RUN apk add --no-cache \
-    bash \
-    gzip \
-    tar \
-    procps \
-    coreutils \
-    jq
+RUN apk add --no-cache curl \
+ && curl -fsSL -o /tmp/jattach \
+      "https://github.com/jattach/jattach/releases/download/${JATTACH_VERSION}/jattach" \
+ && chmod +x /tmp/jattach \
+ && mkdir -p /usr/local/bin \
+ && mv /tmp/jattach /usr/local/bin/jattach
 
-COPY --from=builder /jattach /usr/local/bin/jattach
+FROM cgr.dev/chainguard/wolfi-base:latest
 
-ENTRYPOINT ["/bin/bash","-lc"]
-CMD ["echo 'kheap toolbox ready'"]
+USER root
+
+RUN apk add --no-cache procps \
+ && mkdir -p /usr/local/bin
+
+COPY --from=builder /usr/local/bin/jattach /usr/local/bin/jattach
